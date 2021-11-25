@@ -1,0 +1,10 @@
+python=3.9.1
+requests
+pandas
+numpy
+rasterio
+matplotlib
+seaborn
+astropy
+scipy
+pyproj
