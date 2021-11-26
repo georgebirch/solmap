@@ -20,7 +20,31 @@ from astropy.coordinates import get_sun, AltAz, EarthLocation
 from astropy.time import Time , TimeDelta, TimezoneInfo
 import astropy.units as u
 
-def get_mtn_sun_times(mdf):
+def get_suntimes (peaks_df, sun_df, date = 'Today', print_times = False):
+    peaks_df = peaks_df.copy()
+    sun_df = sun_df.copy()
+    peaks_df.set_index('bearing_deg', inplace = True)
+    peaks_df.drop(columns='bearing', inplace = True)
+    peaks_df.index = peaks_df.index.rename('bearing')
+
+    sun_df.index = sun_df.azimuth.copy().rename('bearing')
+
+    mdf = pd.merge(peaks_df, sun_df, how = 'outer', left_index = True , right_index = True)
+    mdf.peak_angle = mdf.peak_angle.interpolate('linear')
+    mdf.dropna(subset = ['azimuth'], inplace = True)
+    mdf.horizon = 0
+    mdf.reset_index(inplace = True)
+
+    # mtn_sunrise = Time( mdf.loc[mdf.peak_angle < mdf.elevation].time.min() ).to_value( format = 'ymdhms' )[[ 'hour', 'minute', 'second'] ] 
+    # mtn_sunset = Time( mdf.loc[mdf.peak_angle < mdf.elevation].time.max() ).to_value( format = 'ymdhms' )[[ 'hour', 'minute', 'second'] ] 
+
+    mtn_sunrise = [ mdf.loc[mdf.peak_angle < mdf.elevation].time.min() ][0]
+    mtn_sunset = [ mdf.loc[mdf.peak_angle < mdf.elevation].time.max() ][0]
+
+    if print_times:
+        print(date)
+        print('Sunrise at ', mtn_sunrise.hour, ':', mtn_sunrise.minute)
+        print('Sunset at ', mtn_sunset.hour, ':', mtn_sunset.minute)
     
     mdf['daylight'] = mdf.loc[mdf.sunlight == 'day'].sunlight
     night = mdf.loc[mdf.sunlight != 'day'].sunlight
@@ -40,7 +64,7 @@ def get_mtn_sun_times(mdf):
 
     return mdf
 
-def get_sun_path (lat, lon, height, date = None ): 
+def get_sun_path (gps_coords, height, date = None ): 
     resolution = 500
     CET = TimezoneInfo(utc_offset = 1*u.hour)
 
@@ -60,6 +84,7 @@ def get_sun_path (lat, lon, height, date = None ):
     time = ( Time(midnight_this_morning) + time_since_midnight )
     time = time.to_datetime(timezone=CET)
 
+    lat,lon = gps_coords
     loc = EarthLocation.from_geodetic(lon, lat, height = height, ellipsoid = 'WGS84')
     altaz = AltAz(obstime=time, location=loc )
     zen_ang = get_sun(Time(time)).transform_to(altaz)
@@ -174,33 +199,6 @@ def get_targets(observer_lat, observer_lon, tile_meta_df, radius):
     target_tiles.reset_index(inplace = True)
     return target_tiles
 
-def get_suntimes (peaks_df, sun_df, date = 'Today', print_times = False):
-    peaks_df = peaks_df.copy()
-    sun_df = sun_df.copy()
-    peaks_df.set_index('bearing_deg', inplace = True)
-    peaks_df.drop(columns='bearing', inplace = True)
-    peaks_df.index = peaks_df.index.rename('bearing')
-
-    sun_df.index = sun_df.azimuth.copy().rename('bearing')
-
-    mdf = pd.merge(peaks_df, sun_df, how = 'outer', left_index = True , right_index = True)
-    mdf.peak_angle = mdf.peak_angle.interpolate('linear')
-    mdf.dropna(subset = ['azimuth'], inplace = True)
-    mdf.horizon = 0
-    mdf.reset_index(inplace = True)
-
-    # mtn_sunrise = Time( mdf.loc[mdf.peak_angle < mdf.elevation].time.min() ).to_value( format = 'ymdhms' )[[ 'hour', 'minute', 'second'] ] 
-    # mtn_sunset = Time( mdf.loc[mdf.peak_angle < mdf.elevation].time.max() ).to_value( format = 'ymdhms' )[[ 'hour', 'minute', 'second'] ] 
-
-    mtn_sunrise = [ mdf.loc[mdf.peak_angle < mdf.elevation].time.min() ][0]
-    mtn_sunset = [ mdf.loc[mdf.peak_angle < mdf.elevation].time.max() ][0]
-
-    if print_times:
-        print(date)
-        print('Sunrise at ', mtn_sunrise.hour, ':', mtn_sunrise.minute)
-        print('Sunset at ', mtn_sunset.hour, ':', mtn_sunset.minute)
-    return mdf
-
 def get_tile_metadata(filename):
     df = pd.read_csv(filename, names = ['tile'])
     df['left_bound'] = [ int( tile.partition('3d_')[2][5:9] ) * 1000 for tile in df.tile ]
@@ -214,5 +212,40 @@ def get_tile_metadata(filename):
 
     return df
 
+def get_data(gps_coords, observer_height, peaks_df, start_date, final_date = None, td = None):
+    hour = np.arange(4, 22)
+    tdf_ = pd.DataFrame(columns = ['date', 'time', 'azimuth', 'elevation'])
+    tdf = tdf_.copy()
+    date = start_date
+    while date <= (start_date if final_date == None else final_date):
+        sun_df = get_sun_path(gps_coords, observer_height, date)
+        mdf = get_suntimes (peaks_df, sun_df)
+        mdf['date'] = date
+        # time_df.index = ['azimuth', 'elevation']
+        amdf = pd.DataFrame()
+        for i in hour:
+            ind = mdf.time_since_midnight.sub( i*60 ).abs().idxmin()
+            tdf_.loc[i, 'azimuth'] = mdf.loc[ind, 'azimuth']
+            tdf_.loc[i, 'elevation'] = mdf.loc[ind, 'elevation'] 
+        tdf_['grad'] = np.gradient(tdf_.elevation, tdf_.azimuth)
+        tdf_['date'] = date
+        tdf_['time'] = hour
+        tdf_['midday_elev'] = max(mdf.elevation)
+        tdf = pd.concat([tdf, tdf_])
+        tdf.reset_index(drop = True, inplace = True)
+        amdf = pd.concat([amdf, mdf]) # Group all data into one 
+        date = date + ( datetime.timedelta(days = 1) if td == None else td) 
 
+    epoch_df = pd.DataFrame()
+    for date, gdf in amdf.groupby('date'):
+        gdf.sort_values('time_since_midnight', inplace =True)
+        epoch_df_ = pd.DataFrame(columns = ['date', 'epoch', 'start_time', 'end_time', 'daylight'])
+        for i, epoch in enumerate(gdf.epoch.unique()):
+            start = gdf.loc[ gdf.epoch == epoch , 'time_since_midnight' ].min()
+            end = gdf.loc[ gdf.epoch == epoch , 'time_since_midnight' ].max()
+            daylight = str( gdf.loc[ gdf.epoch == epoch , 'daylight' ].unique() )
+            epoch_df_.loc[i, :] = [ date, epoch, start, end, daylight ]
+        epoch_df = pd.concat([epoch_df, epoch_df_])
+
+    return mdf, tdf, epoch_df
 

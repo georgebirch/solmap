@@ -12,15 +12,6 @@ app = dash.Dash(__name__)
 server = app.server
 
 month = 1
-def get_py_fig(month):
-    gps_loc = 46.500458, 8.052669
-    year = 2020
-    day = 1
-    date = {'year':year,'month':month,'day':day}
-    fig = get_figure(gps_loc, date)
-    return py.tools.mpl_to_plotly(fig)
-
-
 
 months = np.arange(1,12)
 
