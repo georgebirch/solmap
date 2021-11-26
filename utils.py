@@ -8,10 +8,13 @@ import numpy as np
 import rasterio as rio
 from rasterio.plot import show
 from rasterio import merge
-from matplotlib import pyplot as plt
-import seaborn as sns
+
 from pyproj import Transformer
-# from matplotlib import pyplot as plt
+
+import plotly.graph_objects as go
+import plotly.io as pio
+import plotly as py
+
 
 from scipy.interpolate import interpn
 
@@ -248,4 +251,58 @@ def get_data(gps_coords, observer_height, peaks_df, start_date, final_date = Non
         epoch_df = pd.concat([epoch_df, epoch_df_])
 
     return mdf, tdf, epoch_df
+
+
+def make_line_dict(x, y, color = 'black', width = .5):
+    return {'line': {'color': color,
+            'dash': 'solid',
+            'width': width},
+            'mode': 'lines',
+            'name': '_line0',
+            'showlegend' : False,
+            'x': x,
+            'xaxis': 'x',
+            'y': y,
+            'yaxis': 'y',
+            'type': 'scatter'}
+
+def make_annotation_dict(x, y, text, xshift):
+    return  {'text':text, 'x':float(x), 'y':float(y), 
+            'xanchor':'center', 
+            'yanchor':'middle', 
+            # 'height':30,
+            'xshift':10*xshift,
+            'yshift':-20,
+            'showarrow':False
+            } 
+
+def get_sun_lines(mdf):
+    lines = []
+    x = mdf.loc[ mdf.daylight == 'day' ].bearing
+    y = mdf.loc[ mdf.daylight == 'day' ].elevation
+    lines.append(make_line_dict(x, y, color = 'gold', width = .5))
+
+    # x = mdf.loc[ mdf.daylight == 'day' ].bearing
+    # y = mdf.loc[ mdf.daylight == 'day' ].elevation
+    # f = sns.lineplot(x = x, y = y , color = 'gold', linewidth=4)
+
+    x = mdf.loc[ mdf.sunlight == 'morning_twighlight' ].azimuth
+    y = mdf.loc[ mdf.sunlight == 'morning_twighlight' ].elevation
+    # sns.lineplot(x = x, y = y , color = 'royalblue', linewidth=1)
+    lines.append(make_line_dict(x, y, color = 'royalblue', width = .5))
+
+
+    x = mdf.loc[ mdf.sunlight == 'evening_twighlight' ].azimuth
+    y = mdf.loc[ mdf.sunlight == 'evening_twighlight' ].elevation
+    # sns.lineplot(x = x, y = y , color = 'royalblue', linewidth=1)
+    lines.append(make_line_dict(x, y, color = 'royalblue', width = .5))
+
+    for epoch in mdf.epoch.unique():
+        if epoch%2 == 1:
+            x = mdf.loc[ mdf.epoch == epoch ].azimuth
+            y = mdf.loc[ mdf.epoch == epoch ].elevation
+            # sns.lineplot(x = x, y = y , color = 'gold', linewidth=4)
+            lines.append(make_line_dict(x, y, color = 'gold', width = 2))
+
+    return lines            
 
