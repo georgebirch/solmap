@@ -41,7 +41,7 @@ def get_mtn_sun_times(mdf):
     return mdf
 
 def get_sun_path (lat, lon, height, date = None ): 
-
+    resolution = 500
     CET = TimezoneInfo(utc_offset = 1*u.hour)
 
     if date == None:
@@ -56,7 +56,7 @@ def get_sun_path (lat, lon, height, date = None ):
 
     midnight_this_morning = datetime.datetime(year,month,day, 0,0,0 , tzinfo = CET)
 
-    time_since_midnight = np.linspace(4*60, 21*60 + 59, 500) * u.min
+    time_since_midnight = np.linspace(4*60, 21*60 + 59, resolution) * u.min
     time = ( Time(midnight_this_morning) + time_since_midnight )
     time = time.to_datetime(timezone=CET)
 

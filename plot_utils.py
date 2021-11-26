@@ -108,18 +108,18 @@ def plot_main(google_lat, google_lon, observer_height, peaks_df, start_date, fin
 
         plot_sun_paths(mdf)
 
-    gdf = tdf.groupby('time')
-    for hour, df in gdf:
-        df = df.sort_values('date').reset_index()
-        # print(df.head)
-        x = df.azimuth
-        y = df.elevation
-        m = df.grad
-        verts = list( zip( list( np.ones(len(m))),  list(m) ) )    
-        sns.lineplot(x=x, y=y, sort=False, color='k', linewidth=0.5)
-        # plt.scatter(x=x,y=y,color='k' \
-        # , marker = verts \
-        # )
+    # gdf = tdf.groupby('time')
+    # for hour, df in gdf:
+    #     df = df.sort_values('date').reset_index()
+    #     # print(df.head)
+    #     x = df.azimuth
+    #     y = df.elevation
+    #     m = df.grad
+    #     verts = list( zip( list( np.ones(len(m))),  list(m) ) )    
+    #     sns.lineplot(x=x, y=y, sort=False, color='k', linewidth=0.5)
+    #     # plt.scatter(x=x,y=y,color='k' \
+    #     # , marker = verts \
+    #     # )
     plot_timelines(tdf)
 
     sns.set_theme(style="whitegrid", font_scale = 1)
@@ -128,5 +128,44 @@ def plot_main(google_lat, google_lon, observer_height, peaks_df, start_date, fin
     ax.set_ylim(-10)
     plt.xlabel( 'Compass Bearing from North')
     plt.ylabel( 'Elevation Angle from Horizon')
-    plt.show()
+    # plt.show()
     fig.savefig('/Users/george-birchenough/Documents/Plots/vectorplot.eps', format='eps')
+    return fig
+
+
+
+def get_figure(gps_loc, date):
+
+    lat, lon = gps_loc
+
+    interval = 30
+    n_intervals = 0
+
+    # start_date = datetime.datetime.now().date()
+
+    start_date = datetime.date(year = date['year'], month = date['month'], day = date['day'])
+
+    td = datetime.timedelta(days = interval)
+    final_date = start_date + n_intervals * td
+
+    metadata_links = {'2m' : '/Users/george-birchenough/Downloads/ch.swisstopo.swissalti3d-fGQ3d2A6.csv' , \
+                    '0.5m' : 'https://ogd.swisstopo.admin.ch/resources/ch.swisstopo.swissalti3d-3TuKAiHo.csv' }
+
+    transformer = Transformer.from_crs( 'epsg:4326', 'epsg:2056' )
+    swiss_topo_lon, swiss_topo_lat = transformer.transform( lat, lon)
+
+    filename = metadata_links['2m']
+    grid_size = 2
+    radius = 1
+    tile_meta_df = get_tile_metadata(filename)
+    target_tiles = get_targets(swiss_topo_lat, swiss_topo_lon, tile_meta_df, radius)
+    plot_tile_corners(target_tiles)
+
+    array, blank_array = get_tiles(target_tiles)
+
+    observer_pixel, observer_height = get_observer_position(array, blank_array, swiss_topo_lat, swiss_topo_lon )
+    peaks_df = get_peaks( array, observer_pixel, observer_height, grid_size)
+
+
+    fig = plot_main(lat, lon, observer_height, peaks_df, start_date, final_date, td )
+    return fig
