@@ -83,7 +83,7 @@ def get_sun_path (gps_coords, height, date = None ):
 
     midnight_this_morning = datetime.datetime(year,month,day, 0,0,0 , tzinfo = CET)
 
-    time_since_midnight = np.linspace(4*60, 21*60 + 59, resolution) * u.min
+    time_since_midnight = np.linspace(0, 24*60, resolution) * u.min
     time = ( Time(midnight_this_morning) + time_since_midnight )
     time = time.to_datetime(timezone=CET)
 
@@ -157,10 +157,11 @@ def get_peaks( array, observer_pixel, observer_height, grid_size ):
     
     return df
 
-def get_tiles(target_tiles):
+def get_tiles(target_tiles, source = 'online'):
+    target_tiles['source'] = target_tiles['local_tile'] if source == 'local' else target_tiles['tile']
     src_list = []
-    for i, tile_path in enumerate( target_tiles.tile ):
-        print('Opening tile number ', i, ' of ', target_tiles.tile.size)
+    for i, tile_path in enumerate( target_tiles.source ):
+        print('Opening tile number ', i, ' of ', target_tiles.source.size)
         src_list.append(rio.open(tile_path, mode='r'))
     print('Done.')
     print('Merging ... ')
@@ -204,6 +205,7 @@ def get_targets(observer_lat, observer_lon, tile_meta_df, radius):
 
 def get_tile_metadata(filename):
     df = pd.read_csv(filename, names = ['tile'])
+    df['local_tile'] =  [ '/Users/george-birchenough/Documents/SwissAlti3D_2m/' +  tile.partition('3d_')[2].partition('3d_')[2] for tile in df.tile]
     df['left_bound'] = [ int( tile.partition('3d_')[2][5:9] ) * 1000 for tile in df.tile ]
     df['bottom_bound'] = [ int( tile.partition('3d_')[2][10:14] ) * 1000 for tile in df.tile ]
 #     df[['left_bound', 'bottom_bound']] = df[['left_bound', 'bottom_bound']].astype(int)
@@ -214,6 +216,7 @@ def get_tile_metadata(filename):
     df['tile_info'] = [tile.partition('3d_')[2].partition('3d_')[2].partition('.tif')[0][-9:] for tile in df.tile]
 
     return df
+
 
 def get_data(gps_coords, observer_height, peaks_df, start_date, final_date = None, td = None):
     hour = np.arange(4, 22)
