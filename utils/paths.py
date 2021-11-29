@@ -164,7 +164,7 @@ def get_peaks( array, observer_pixel, observer_height, grid_size ):
     
     return df
 
-def get_mtn_geometry(gps_coords):
+def get_mtn_geometry(gps_coords, radius):
     gps_lat, gps_lon = gps_coords
     transformer = Transformer.from_crs( 'epsg:4326', 'epsg:2056' )
     swiss_topo_lon, swiss_topo_lat = transformer.transform( gps_lat, gps_lon)
@@ -175,8 +175,6 @@ def get_mtn_geometry(gps_coords):
     filename = metadata_links['2m']
     global grid_size
     grid_size = 2
-
-    radius = 5
 
     tile_meta_df = get_tile_metadata(filename, local_data_dir)
     target_tiles = get_targets(swiss_topo_lat, swiss_topo_lon, tile_meta_df, radius)

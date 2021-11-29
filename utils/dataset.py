@@ -13,12 +13,12 @@ def get_tiles(target_tiles, source = 'local'):
 
     src_list = []
     for i, tile_path in enumerate( target_tiles.source ):
-        print('Opening tile number ', i, ' of ', target_tiles.source.size)
+        # print('Opening tile number ', i, ' of ', target_tiles.source.size)
         src_list.append(rio.open(tile_path, mode='r'))
-    print('Done.')
-    print('Merging ... ')
+    # print('Done.')
+    # print('Merging ... ')
     array, transform = rio.merge.merge(src_list)
-    print('Done.')
+    # print('Done.')
     src = src_list[0]
     blank_array = rio.open( \
         '/tmp/new.tif', \
@@ -38,7 +38,6 @@ def save_tiles(target_tiles):
         out_path = base + str(target_tiles.index[i]) + '.tif'
         print(out_path)
         urllib.request.urlretrieve(tile_path, out_path)
-
 
 def get_targets(observer_lat, observer_lon, tile_meta_df, radius):
     df = tile_meta_df
