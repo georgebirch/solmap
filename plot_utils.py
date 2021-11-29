@@ -1,4 +1,6 @@
 from utils import *
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 def plot_timelines(tdf):
     min_date = tdf.loc[tdf.midday_elev.idxmin(), 'date'  ]
@@ -76,8 +78,6 @@ def plot_tile_corners(target_tiles):
     fig, ax = plt.subplots(figsize = [10,10])
     fig = plt.plot(x,y)
     ax.set_aspect('equal')
-
-   
 
 def plot_main(google_lat, google_lon, observer_height, peaks_df, start_date, final_date, td ):
     fig, ax = plt.subplots(figsize=(30, 10))

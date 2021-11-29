@@ -5,6 +5,7 @@ import os
 import pandas as pd
 import numpy as np
 
+
 import rasterio as rio
 from rasterio.plot import show
 from rasterio import merge
@@ -14,7 +15,7 @@ from pyproj import Transformer
 import plotly.graph_objects as go
 import plotly.io as pio
 import plotly as py
-
+import plotly.offline as pyo
 
 from scipy.interpolate import interpn
 
@@ -128,7 +129,7 @@ def get_peaks( array, observer_pixel, observer_height, grid_size ):
     points = ( cols, rows )
     array_for_interp = array.T
 
-    angular_resolution = 1000 # / 360 deg
+    angular_resolution = 500 # / 360 deg
     radius = 6000 # m
     n_steps = int( radius * 1.5 / grid_size) 
     peak = []
@@ -165,7 +166,7 @@ def get_tiles(target_tiles, source = 'online'):
         src_list.append(rio.open(tile_path, mode='r'))
     print('Done.')
     print('Merging ... ')
-    array, transform = rio.merge.merge(src_list)
+    array, transform = rio.merge.merge(src_list )
     print('Done.')
     src = src_list[0]
     blank_array = rio.open( \
@@ -178,7 +179,7 @@ def get_tiles(target_tiles, source = 'online'):
         crs=src_list[0].crs, \
         transform=transform, \
         dtype = array.dtype)
-    return array, blank_array
+    return array, blank_array, transform
 
 def save_tiles(target_tiles):
     base = '/Users/george-birchenough/Documents/SwissAlti3D_temp/'
@@ -309,3 +310,27 @@ def get_sun_lines(mdf):
 
     return lines            
 
+
+def get_azimuth_vector(azimuth):
+    yabs = abs (np.cos(azimuth * np.pi/180) )
+    xabs = (1 - yabs**2)**0.5
+    if azimuth < 90:
+        return xabs, yabs
+    elif azimuth < 180:
+        return xabs, -1*yabs
+    elif azimuth < 270:
+        return -1*xabs, -1*yabs
+    elif azimuth < 360:
+        return -1*xabs, yabs
+
+# def get_shadows(slice, inter_points, el_vector, grid_size = 2):
+#     dict = {'x':inter_points[:,0], 'y':inter_points[:,1], 'z':slice}
+#     df = pd.DataFrame.from_dict(dict)
+
+#     for index in df.index:
+#         difs = df.loc[index::, 'z'] - df.loc[index,'z']
+#         dists = df.index[index::] * grid_size
+#         df.loc[index, 'max_vect'] = max( [difs/dists] )
+#         if any(difs / dists > el_vector):
+#             df.loc[index, 'shadow'] = True
+#     return df
