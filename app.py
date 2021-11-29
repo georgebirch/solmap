@@ -14,31 +14,53 @@ radius = 1
 
 def main():
     global mdf_list, tdf_list, amdf_list 
-    mdf_list, tdf_list, amdf_list  = get_df_lists(gps_coords, radius)
+    mdf_list, tdf_list, amdf_list = get_df_lists(gps_coords, radius)
 
     app = dash.Dash(__name__)
     server = app.server
 
     month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-    app.layout = html.Div([
-            dcc.Graph(
-                id='plot1', 
-            ),
-            dcc.Slider(
-                id='month_slider',
-                min=1,
-                max=12,
-                marks = { i+1:{'label':month_names[i]} for i in range(12) },
-                value = 6,
-                tooltip=dict(always_visible = True, placement = 'bottom')
-            ),
-            # dcc.Dropdown(id='date-select', 
-            # options=[ {'label': month_names[i], 'value': i} for i in np.arange(12)],
-            #                     # style={'width': '140px', 'align-items': 'center'}
-            #                     # style = {'width':'100%', 'display': 'flex', 'align-items': 'center', 'justify-content': 'center'}                        
-            # ),
-            ])
+    app.layout = html.Div(children=[
+        html.Div(className='row',  # Define the row element
+            children=[
+                html.Div(className='twelve columns div-for-chart center',
+                children = [
+                    dcc.Graph(
+                        id='plot1',
+                    )
+                ]),  # Define the left element
+            ]),
+        html.Div(className='row',
+            children=[
+                # html.Div(className='10 columns center'),
+                html.Div(
+                    className='div-for-slider center',
+                    style = {'color': 'blue', 'fontSize': 14, 'fontFamily':'Arial'},
+                    children = [
+                        dcc.Slider(
+                            id='month_slider',
+                            min=1,
+                            max=12,
+                            # marks = { i+1:{'label':month_names[i], 'style':{'color':'red', 'font':{'family':'Verdana','size':22} } } for i in range(12) },
+                            marks = { i+1:{'label':month_names[i] } for i in range(12)},
+
+                            value = 6,
+                            # tooltip=dict(always_visible = True, placement = 'bottom')
+                        ),
+                    ]
+                )
+            ]
+        ),
+        html.Div(className='row',  # Define the row element
+            children=[
+                html.Div(className = 'logo',
+                    children=[
+                        html.Img(src=app.get_asset_url('sunmap.png'), width=500),  # Define the left element
+                    ]
+                )
+            ]),       
+    ])
 
     @app.callback(
         Output('plot1', 'figure'),
@@ -46,11 +68,12 @@ def main():
     def update_figure(month):
         fig = make_solmap(month)
         return fig
+        
     app.run_server(port = 5000)
 
 def get_df_lists(gps_coords, radius):
     peaks_df, observer_height = get_mtn_geometry(gps_coords, radius)
-    mdf_list, tdf_list, amdf_list = [], [], []
+    mdf_list, tdf_list, amdf_list  = [], [], []
     for month in np.arange(1,13):
         # td = datetime.timedelta(days = interval)
         # final_date = start_date + n_intervals * td
@@ -62,7 +85,7 @@ def get_df_lists(gps_coords, radius):
         mdf_list.append(mdf_)
         tdf_list.append(tdf_)
         amdf_list.append(amdf_)
-    return mdf_list, tdf_list, amdf_list
+    return mdf_list, tdf_list, amdf_list 
 
 def make_solmap(month): 
     mdf = mdf_list[month-1]
@@ -78,7 +101,6 @@ def make_solmap(month):
                     fillcolor = 'black'
                     # fill = 'tozeroy'
                     )
-
     diff_lines = dict(
                     type = 'scatter',
                     x = mdf.bearing,
@@ -89,7 +111,6 @@ def make_solmap(month):
                     fillcolor = 'gold'
                     # fill = 'tozeroy'
                     )
-
     sun_line = dict(
                     type = 'scatter',
                     x = mdf.loc[ mdf.daylight == 'day' ].bearing,
@@ -98,6 +119,7 @@ def make_solmap(month):
                         color = 'white',
                         width = 0.5),
                 )
+    
     ticks, annotations = get_annotations(tdf)
 
     pio.templates.default = "simple_white"
@@ -112,25 +134,28 @@ def make_solmap(month):
     fig.add_traces(
         ticks
     )
+    max_y = max( [ max( [mdf_.elevation.max(), mdf_.peak_angle.max()] ) for mdf_ in mdf_list ] )
 
     fig.update_layout( 
         annotations = annotations,
         xaxis = dict(
             tickmode = 'array',
-            tickvals = [0, 22.5, 45.0, 67.5, 90.0, 112.5, 135.0, 157.5, 180.0, 202.5, 225.0, 247.5, 270.0, 292.5, 315, 337.5] ,
-            ticktext = ['N', 'ENE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NWN'],
-            range = [90, 270],
+            tickvals = [0, 22.5, 45.0, 67.5, 90.0, 112.5, 135.0, 157.5, 180.0, 202.5, 225.0, 247.5, 270.0, 292.5, 315, 337.5, 360] ,
+            ticktext = ['N', 'ENE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NWN', 'N'],
+            range = [45, 315],
         ),
         yaxis = dict(
-            range = [0, 60],
+            range = [0, max_y],
             anchor = 'free',
             position = 0.5,
-            visible = False
+            visible = False,
+            scaleanchor = 'x',
+            scaleratio = 0.6
         ),
         showlegend=False,
-        autosize=False,
-        width=1500,
-        height=800,
+        autosize=True,
+        height=600,
+        # margin={'t': 50},
         # margin=dict(
         #     l=50,
         #     r=50,
@@ -139,7 +164,7 @@ def make_solmap(month):
         #     pad=4
         # ),
         paper_bgcolor="white",
-        font = dict( family = 'verdana', size = 18 )
+        font = dict( family = 'verdana', size = 12 )
 
     )
     return fig
@@ -172,7 +197,7 @@ def get_annotations(tdf):
             y = y,
             xanchor = 'center',
             yanchor = 'middle',
-            xshift = 10 * grad,
+            xshift = 15 * grad,
             yshift = -20,
             showarrow = False,
             font = dict(color = 'white'),

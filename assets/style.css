@@ -220,13 +220,12 @@ a:hover {
 }
 /* Buttons –––––––––––––––––––––––––––––––––––––––––––––––––– */
 .rc-slider-track{
-  background-color: #007eff
+  background-color: #000000
 }
 
 .rc-slider-rail{
-  background-color: #505050
+  background-color: #ffe600
 }
-
 
 .main-svg{
   font-family: "Open Sans Semi Bold"
@@ -419,7 +418,7 @@ html, body{
 }
 
 body {
-  background-color: #1E1E1E;
+  background-color: #ffffff;  
   color: #d8d8d8;
   height: 100%;
   margin: 0;
@@ -458,6 +457,14 @@ a {
   height: 100vh;
   width: 100%;
 }
+
+.center{
+  margin: auto;
+  width: 70%;
+  /* border: 3px solid green; */
+  padding: 10px;
+}
+
 #histogram {
   flex-grow: 1
 }
@@ -477,12 +484,16 @@ a {
   padding-bottom: 12px;
 }
 .div-for-slider {
-  width: 97%;
+  width: 80%;
   text-align: center;
+  padding-left: 10%;
+  padding-right: 10%;
 }
 .logo {
-  height: 50px;
-  padding-bottom: 12px;
+  width: 10%;
+  padding-left: 35%;
+  padding-right: 30%;
+  padding-top: 12px;
 }
 .Select-control, .Select-menu-outer, .Select-multi-value-wrapper, .select-up, .is-open .Select-control {
   background-color: #1E1E1E;
