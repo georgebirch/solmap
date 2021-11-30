@@ -1,20 +1,23 @@
+from flask.scaffold import find_package
 from utils.paths import *
 from utils.dataset import *
-from utils.plot_utils import *
 
 from pkg_resources import get_platform
 
 import dash
 from dash import dcc
 from dash import html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
+from dash.exceptions import PreventUpdate
 
 gps_coords = 46.58724, 7.99614
-radius = 1
+# global radius, grid_size
+radius = 10000
+grid_size = 10
+
 
 def main():
-    global mdf_list, tdf_list, amdf_list 
-    mdf_list, tdf_list, amdf_list = get_df_lists(gps_coords, radius)
+    get_df_lists(gps_coords, radius)
 
     app = dash.Dash(__name__)
     server = app.server
@@ -22,6 +25,16 @@ def main():
     month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
     app.layout = html.Div(children=[
+   
+        html.Div(className='row',  # Define the row element
+            children=[
+                dcc.Input(id="input_coords", type="text", value='46.07633, 7.29514'),
+                html.Button(id='btn_state', n_clicks=0 ),
+                # dcc.Input(id="input_lon", type="number", value=7.9961, debounce=True),
+                html.Div(id='output_state')
+            ] 
+        ),
+
         html.Div(className='row',  # Define the row element
             children=[
                 html.Div(className='twelve columns div-for-chart center',
@@ -44,7 +57,6 @@ def main():
                             max=12,
                             # marks = { i+1:{'label':month_names[i], 'style':{'color':'red', 'font':{'family':'Verdana','size':22} } } for i in range(12) },
                             marks = { i+1:{'label':month_names[i] } for i in range(12)},
-
                             value = 6,
                             # tooltip=dict(always_visible = True, placement = 'bottom')
                         ),
@@ -52,14 +64,11 @@ def main():
                 )
             ]
         ),
-        html.Div(className='row',  # Define the row element
-            children=[
-                html.Div(className = 'logo',
-                    children=[
-                        html.Img(src=app.get_asset_url('sunmap.png'), width=500),  # Define the left element
-                    ]
+        html.Div(className='container',  # Define the row element
+            children=
+                html.Div(html.Img(src=app.get_asset_url('sunmap.png') ),  # Define the left element
                 )
-            ]),       
+                )
     ])
 
     @app.callback(
@@ -68,11 +77,31 @@ def main():
     def update_figure(month):
         fig = make_solmap(month)
         return fig
-        
-    app.run_server(port = 5000)
+
+    @app.callback(
+        Output('month_slider', 'value'),
+        Input('btn_state', 'n_clicks'),
+        State('input_coords', 'value'),
+        State('month_slider', 'value'))
+    def update_location(n_clicks, input_coords, month):
+        if n_clicks is not None:    
+            lat = float( input_coords.partition(',')[0] )
+            lon = float( input_coords.partition(',')[2] )
+            new_coords = (lat,lon)
+            print('New coords :', new_coords)
+            get_df_lists(new_coords, radius)
+            return month
+
+    app.run_server(port = 5000, debug = True)
 
 def get_df_lists(gps_coords, radius):
-    peaks_df, observer_height = get_mtn_geometry(gps_coords, radius)
+    print('getting new geometry')
+    array, observer_pixel, observer_height  = get_masked_data(gps_coords, radius)
+
+    peaks_df = get_peaks( array, observer_pixel, observer_height, radius, grid_size)
+    global mdf_list
+    global tdf_list
+    global amdf_list 
     mdf_list, tdf_list, amdf_list  = [], [], []
     for month in np.arange(1,13):
         # td = datetime.timedelta(days = interval)
@@ -85,9 +114,9 @@ def get_df_lists(gps_coords, radius):
         mdf_list.append(mdf_)
         tdf_list.append(tdf_)
         amdf_list.append(amdf_)
-    return mdf_list, tdf_list, amdf_list 
+    # return mdf_list, tdf_list, amdf_list 
 
-def make_solmap(month): 
+def make_solmap(month = 6): 
     mdf = mdf_list[month-1]
     tdf = tdf_list[month-1]
 
@@ -165,7 +194,6 @@ def make_solmap(month):
         # ),
         paper_bgcolor="white",
         font = dict( family = 'verdana', size = 12 )
-
     )
     return fig
 

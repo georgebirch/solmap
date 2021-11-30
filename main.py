@@ -1,6 +1,5 @@
 from utils.paths import *
 from utils.dataset import *
-from utils.plot_utils import *
 
 from pkg_resources import get_platform
 

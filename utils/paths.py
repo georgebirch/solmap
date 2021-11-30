@@ -7,14 +7,13 @@ import numpy as np
 
 import rasterio as rio
 from rasterio.plot import show
-from rasterio import merge
+from rasterio import merge, mask
 
 from pyproj import Transformer
 
 import plotly.graph_objects as go
 import plotly.io as pio
 import plotly as py
-
 
 from scipy.interpolate import interpn
 
@@ -119,14 +118,7 @@ def get_sun_path (gps_coords, height, date = None ):
     # dusk = daytime.tail(1).time + TimeDelta( 30 * u.min ).to_datetime()
     return df
 
-
-def get_observer_position( array, blank_array, lat, lon ):
-    
-    observer_pixel = blank_array.index(lon, lat)
-    observer_height = array[0, observer_pixel[0] , observer_pixel[1]] + 2
-    return observer_pixel, observer_height
-
-def get_peaks( array, observer_pixel, observer_height, grid_size ):
+def get_peaks( array, observer_pixel, observer_height, radius, grid_size ):
     
     nrows,ncols = array.shape[1:]
     rows = np.arange(nrows)
@@ -135,13 +127,12 @@ def get_peaks( array, observer_pixel, observer_height, grid_size ):
     array_for_interp = array.T
 
     angular_resolution = 1000 # / 360 deg
-    radius = 6000 # m
-    n_steps = int( radius * 1.5 / grid_size) 
+    pixels = radius / grid_size 
     peak = []
     bearing = np.linspace(0, np.pi * 2 , angular_resolution)
 
     for i, bearing_ in enumerate( bearing ):
-        step = np.linspace(1, radius/grid_size, n_steps)
+        step = np.arange(pixels)
         x_sample =  observer_pixel[1] + np.array( step * np.sin(bearing_) )
         y_sample =  observer_pixel[0] - np.array( step * np.cos(bearing_) )
 
@@ -150,8 +141,8 @@ def get_peaks( array, observer_pixel, observer_height, grid_size ):
         heights = interpn(points, array_for_interp, inter_points, \
                     method = 'linear', bounds_error = False, fill_value = observer_height )[:,0]   \
                      - observer_height
-        distances = step * grid_size
-        peak_angle = max (  heights / distances )
+        distances = step * grid_size + 1 # in metres
+        peak_angle = max (  heights / ( distances) )
         peak.append(peak_angle)
 
     df = pd.DataFrame()
@@ -163,28 +154,6 @@ def get_peaks( array, observer_pixel, observer_height, grid_size ):
     df['horizon'] = 0
     
     return df
-
-def get_mtn_geometry(gps_coords, radius):
-    gps_lat, gps_lon = gps_coords
-    transformer = Transformer.from_crs( 'epsg:4326', 'epsg:2056' )
-    swiss_topo_lon, swiss_topo_lat = transformer.transform( gps_lat, gps_lon)
-
-    metadata_links = {'2m' : 'ch.swisstopo.swissalti3d-eNRG3gdj.csv' , \
-                    '0.5m' : 'https://ogd.swisstopo.admin.ch/resources/ch.swisstopo.swissalti3d-3TuKAiHo.csv' }
-    local_data_dir = '/Users/george-birchenough/Documents/SwissAlti3D_2m'
-    filename = metadata_links['2m']
-    global grid_size
-    grid_size = 2
-
-    tile_meta_df = get_tile_metadata(filename, local_data_dir)
-    target_tiles = get_targets(swiss_topo_lat, swiss_topo_lon, tile_meta_df, radius)
-    # plot_tile_corners(target_tiles)
-
-    array, blank_array, transform = get_tiles(target_tiles)
-
-    observer_pixel, observer_height = get_observer_position(array, blank_array, swiss_topo_lat, swiss_topo_lon )
-    peaks_df = get_peaks( array, observer_pixel, observer_height, grid_size)
-    return peaks_df, observer_height
 
 def get_data(gps_coords, observer_height, peaks_df, start_date, final_date = None, td = None):
     hour = np.arange(4, 22)

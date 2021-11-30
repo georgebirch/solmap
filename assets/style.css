@@ -490,11 +490,18 @@ a {
   padding-right: 10%;
 }
 .logo {
-  width: 10%;
-  padding-left: 35%;
+  width: 10px;
+  height: 50px;
+  /* padding-left: 35%;
   padding-right: 30%;
-  padding-top: 12px;
+  padding-top: 12px; */
 }
+
+.div-for-img {
+width: 100%;
+height: auto;
+}
+
 .Select-control, .Select-menu-outer, .Select-multi-value-wrapper, .select-up, .is-open .Select-control {
   background-color: #1E1E1E;
   color: white;
@@ -614,7 +621,7 @@ a {
  .side-by-side-right{
     display: inline-block;
     width: 48%;
-    float:right;
+    /* float: right; */
   }
   .div-for-charts{
     margin: 0px;

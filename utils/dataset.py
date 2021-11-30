@@ -7,64 +7,53 @@ import numpy as np
 
 import urllib.request
 
+import geopandas as gpd
+from shapely.geometry import LineString, LinearRing, Polygon
 
-def get_tiles(target_tiles, source = 'local'):
-    target_tiles['source'] = target_tiles['local_tile'] if source == 'local' else target_tiles['tile']
+from pyproj import Transformer
 
-    src_list = []
-    for i, tile_path in enumerate( target_tiles.source ):
-        # print('Opening tile number ', i, ' of ', target_tiles.source.size)
-        src_list.append(rio.open(tile_path, mode='r'))
-    # print('Done.')
-    # print('Merging ... ')
-    array, transform = rio.merge.merge(src_list)
-    # print('Done.')
-    src = src_list[0]
-    blank_array = rio.open( \
-        '/tmp/new.tif', \
-        'w', \
-        driver='GTiff', \
-        height=array.shape[1], \
-        width=array.shape[2], \
-        count=1, \
-        crs=src_list[0].crs, \
-        transform=transform, \
-        dtype = array.dtype)
-    return array, blank_array, transform
+import geopandas as gpd
+from shapely.geometry import LineString, LinearRing, Polygon
 
-def save_tiles(target_tiles):
-    base = '/Users/george-birchenough/Documents/SwissAlti3D_temp/'
-    for i, tile_path in enumerate( target_tiles.tile ):
-        out_path = base + str(target_tiles.index[i]) + '.tif'
-        print(out_path)
-        urllib.request.urlretrieve(tile_path, out_path)
+def get_masked_data(gps_coords, radius):
+    path = 'DTM Switzerland 10m v2 by Sonny.tif'
+    src = rio.open(path)
 
-def get_targets(observer_lat, observer_lon, tile_meta_df, radius):
-    df = tile_meta_df
-    target_tiles = pd.DataFrame()
-    for y in np.linspace(0, radius , radius + 1 ):
-        x = (radius**2 - y**2 ) ** 0.5
-        for i in np.linspace(-x, x, 2 * radius + 1 ):
-            lon = observer_lon + 1000 * i
-            lat = observer_lat - 1000 * y
-            tile = df.loc[ (df.left_bound < lon) & (df.right_bound > lon) \
-                          & (df.bottom_bound < lat) & (df.top_bound > lat) ]
-            target_tiles = target_tiles.append(tile)
-    target_tiles.drop_duplicates(inplace = True)
-    target_tiles.reset_index(inplace = True)
-    return target_tiles
+    north_buffer = 0.2
+    mask_xy = [ [x, (1 - x**2)**0.5] for x in [ np.cos(theta) for theta in np.linspace(0, np.pi, 10)  ]   ]
+    mask_xy.insert(0, [1, -north_buffer] )
+    mask_xy.append( [-1, -north_buffer] )
 
-def get_tile_metadata(filename, local_data_dir):
-    df = pd.read_csv(filename, names = ['tile'])
-    df['local_tile'] =  [ local_data_dir + '/' + tile.partition('3d_')[2].partition('3d_')[2] for tile in df.tile]
+    mask_df = pd.DataFrame(mask_xy, columns = ['x', 'y'])
+    mask_df['y'] = -1 * mask_df.y
+    mask_df = mask_df.append(mask_df.loc[0], ignore_index=True)
+    mask_df['order'] = mask_df.index
 
-    df['left_bound'] = [ int( tile.partition('3d_')[2][5:9] ) * 1000 for tile in df.tile ]
-    df['bottom_bound'] = [ int( tile.partition('3d_')[2][10:14] ) * 1000 for tile in df.tile ]
-    # df[['left_bound', 'bottom_bound']] = df[['left_bound', 'bottom_bound']].astype(int)
+    gps_lat, gps_lon = gps_coords
+    transformer = Transformer.from_crs( 'epsg:4326', src.crs )
+    lon, lat = transformer.transform( gps_lat, gps_lon)
+    mask_df['lon'] = mask_df.x * radius  + lon
+    mask_df['lat'] = mask_df.y * radius  + lat
+    gdf = gpd.GeoDataFrame(
+        mask_df, geometry=gpd.points_from_xy(mask_df['lon'], mask_df['lat']))
+    lineStringObj = Polygon( [[a.x, a.y] for a in gdf.geometry.values] )
+    dict = {'line':['line'], 'geometry':[lineStringObj]}
+    with rio.open("DTM Switzerland 10m v2 by Sonny.tif") as src:
+        shpgdf = gpd.GeoDataFrame(dict, crs = src.crs)
+        array, transform = rio.mask.mask(src, shpgdf.geometry, crop=True)
+        out_meta = src.meta
+    # out_meta.update({"driver": "GTiff",
+    #                  "height": array.shape[1],
+    #                  "width": array.shape[2],
+    #                  "transform": transform})
 
-    df['right_bound'] = df['left_bound'] + 1000
-    df['top_bound'] = df['bottom_bound'] + 1000
+    # with rio.open("mask2.tif", "w", **out_meta) as dest:
+    #     dest.write(array)
 
-    df['tile_info'] = [tile.partition('3d_')[2].partition('3d_')[2].partition('.tif')[0][-9:] for tile in df.tile]
+    observer_row = int(array.shape[1] / 2)
+    observer_col = int(array.shape[2] / 2)
 
-    return df
+    observer_pixel = [ observer_row, observer_col] 
+
+    observer_height =  array[0, observer_pixel[0] , observer_pixel[1]] + 2
+    return array, observer_pixel, observer_height
